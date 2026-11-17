@@ -45,6 +45,60 @@ export class Complaint {
   })
   status!: ComplaintStatus;
 
+
+  // Original AI urgency prediction
+  @Column({
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+  })
+  aiUrgency!: string | null;
+
+  // Confidence returned by the AI model
+  @Column({
+    type: 'double precision',
+    nullable: true,
+  })
+  aiConfidence!: number | null;
+
+  // Date and time when AI made the prediction
+  @Column({
+    type: 'timestamptz',
+    nullable: true,
+  })
+  aiPredictedAt!: Date | null;
+
+
+  // Officer-assessed severity score (0-100)
+  @Column({
+    type: 'int',
+    nullable: true,
+  })
+  severityScore!: number | null;
+
+  // Officer-assessed public impact score (0-100)
+  @Column({
+    type: 'int',
+    nullable: true,
+  })
+  publicImpactScore!: number | null;
+
+  // Officer-assessed safety risk score (0-100)
+  @Column({
+    type: 'int',
+    nullable: true,
+  })
+  safetyRiskScore!: number | null;
+
+  // Final calculated priority score (0-100)
+  @Column({
+    type: 'double precision',
+    nullable: true,
+  })
+  priorityScore!: number | null;
+
+
+
   @ManyToOne(() => User, { nullable: false })
   @JoinColumn({ name: 'citizen_id' })
   citizen!: User;

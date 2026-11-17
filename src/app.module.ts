@@ -7,6 +7,8 @@ import { UsersModule } from './users/users.module';
 import { DepartmentsModule } from './departments/departments.module';
 import { ComplaintsModule } from './complaints/complaints.module';
 import { AuthModule } from './auth/auth.module';
+import { AiModule } from './ai/ai.module';
+import { PriorityModule } from './priority/priority.module';
 
 @Module({
   imports: [
@@ -37,7 +39,11 @@ import { AuthModule } from './auth/auth.module';
     
   ComplaintsModule,
     
-  AuthModule
+  AuthModule,
+    
+  AiModule,
+    
+  PriorityModule
 
   ],
   controllers: [AppController],

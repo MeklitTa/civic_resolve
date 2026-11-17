@@ -17,6 +17,7 @@ import { User } from '../users/entities/user.entity';
 import { CreateComplaintDto } from './dto/create-complaint.dto';
 import { Department } from 'src/departments/entities/department.entity';
 import { AssignComplaintDto } from './dto/assign-complaint.dto';
+import { AiService } from 'src/ai/ai.service';
 
 @Injectable()
 export class ComplaintsService {
@@ -28,34 +29,66 @@ export class ComplaintsService {
     private readonly usersRepository: Repository<User>,
    @InjectRepository(Department)
      private readonly departmentsRepository: Repository<Department>,
+
+    private readonly aiService: AiService,
   ) {}
 
-  async create(
-    createComplaintDto: CreateComplaintDto,
-    citizenId: string,
-  ) {
-    const citizen = await this.usersRepository.findOne({
-      where: { id: citizenId },
-    });
+ 
+async create(
+  createComplaintDto: CreateComplaintDto,
+  citizenId: string,
+) {
+  // 1. Find the citizen
+  const citizen = await this.usersRepository.findOne({
+    where: { id: citizenId },
+  });
 
-    if (!citizen) {
-      throw new NotFoundException('Citizen not found');
-    }
-
-    const complaintNumber = `CR-${Date.now()}`;
-
-    const complaint = this.complaintsRepository.create({
-      ...createComplaintDto,
-      complaintNumber,
-      status: ComplaintStatus.PENDING,
-      citizen,
-    });
-
-    const savedComplaint =
-      await this.complaintsRepository.save(complaint);
-
-    return savedComplaint;
+  if (!citizen) {
+    throw new NotFoundException('Citizen not found');
   }
+
+  // 2. Ask the Python AI service to predict urgency
+  let aiUrgency: string | null = null;
+  let aiConfidence: number | null = null;
+  let aiPredictedAt: Date | null = null;
+
+  try {
+    const prediction = await this.aiService.predictUrgency(
+      createComplaintDto.description,
+    );
+
+    aiUrgency = prediction.urgency;
+    aiConfidence = prediction.confidence;
+    aiPredictedAt = new Date();
+
+  } catch (error) {
+    // Keep the complaint even if the AI service is unavailable.
+    console.error('AI prediction unavailable:', error);
+  }
+
+  // 3. Generate a complaint number
+  const complaintNumber = `CR-${Date.now()}`;
+
+  // 4. Create the complaint
+  const complaint = this.complaintsRepository.create({
+    ...createComplaintDto,
+    complaintNumber,
+    status: ComplaintStatus.PENDING,
+    citizen,
+
+    // Original AI prediction
+    aiUrgency,
+    aiConfidence,
+    aiPredictedAt,
+  });
+
+  // 5. Save the complaint and its AI prediction
+  const savedComplaint =
+    await this.complaintsRepository.save(complaint);
+
+  return savedComplaint;
+}
+
 async findMyComplaints(citizenId: string) {
   return this.complaintsRepository.find({
     where: {
