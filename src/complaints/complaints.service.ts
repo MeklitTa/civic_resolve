@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -18,6 +19,8 @@ import { CreateComplaintDto } from './dto/create-complaint.dto';
 import { Department } from 'src/departments/entities/department.entity';
 import { AssignComplaintDto } from './dto/assign-complaint.dto';
 import { AiService } from 'src/ai/ai.service';
+import { PriorityService } from 'src/priority/priority.service';
+import { AssessComplaintDto } from './dto/assess-complaint.dto';
 
 @Injectable()
 export class ComplaintsService {
@@ -31,6 +34,7 @@ export class ComplaintsService {
      private readonly departmentsRepository: Repository<Department>,
 
     private readonly aiService: AiService,
+    private readonly priorityService: PriorityService,
   ) {}
 
  
@@ -166,6 +170,106 @@ async findAll(page = 1, limit = 10) {
 
   return this.complaintsRepository.save(complaint);
 }
+
+
+
+
+
+
+
+async assessComplaint(
+  complaintId: string,
+  assessComplaintDto: AssessComplaintDto,
+  officerId: string,
+) {
+  // 1. Find the complaint
+  const complaint = await this.complaintsRepository.findOne({
+    where: { id: complaintId },
+  });
+
+  if (!complaint) {
+    throw new NotFoundException('Complaint not found');
+  }
+
+  // 2. Find the reviewing officer
+  const officer = await this.usersRepository.findOne({
+    where: { id: officerId },
+  });
+
+  if (!officer) {
+    throw new NotFoundException('Officer not found');
+  }
+
+  // 3. Check whether the officer changed the AI prediction
+  const officerUrgency =
+    assessComplaintDto.officerUrgency.trim().toUpperCase();
+
+  const aiUrgency =
+    complaint.aiUrgency?.trim().toUpperCase() ?? null;
+
+  const urgencyChanged =
+    aiUrgency !== null && aiUrgency !== officerUrgency;
+
+  // 4. Require an explanation when urgency changes
+  if (
+    urgencyChanged &&
+    !assessComplaintDto.officerReviewNote?.trim()
+  ) {
+    throw new BadRequestException(
+      'Please provide a reason for changing the AI urgency prediction.',
+    );
+  }
+
+  // 5. Calculate urgency using the officer's decision
+  const urgencyScore =
+    this.priorityService.calculateUrgencyScore(officerUrgency);
+
+  // 6. Calculate waiting time
+  const waitingTimeScore =
+    this.priorityService.calculateWaitingTime(
+      complaint.createdAt,
+    );
+
+  // 7. Calculate final priority
+  const priorityScore =
+    this.priorityService.calculatePriority(
+      urgencyScore,
+      assessComplaintDto.severityScore,
+      assessComplaintDto.publicImpactScore,
+      assessComplaintDto.safetyRiskScore,
+      waitingTimeScore,
+    );
+
+  // 8. Save officer assessment
+  complaint.officerUrgency = officerUrgency;
+  complaint.officerReviewNote =
+    assessComplaintDto.officerReviewNote?.trim() || null;
+
+  complaint.reviewedBy = officer;
+  complaint.reviewedAt = new Date();
+
+  complaint.severityScore = assessComplaintDto.severityScore;
+  complaint.publicImpactScore =
+    assessComplaintDto.publicImpactScore;
+  complaint.safetyRiskScore =
+    assessComplaintDto.safetyRiskScore;
+
+  complaint.priorityScore = priorityScore;
+
+  // 9. Save everything
+  return this.complaintsRepository.save(complaint);
+}
+
+
+
+
+
+
+
+
+
+
+
 async findDepartmentComplaints(departmentId: string) {
   return this.complaintsRepository.find({
     where: {

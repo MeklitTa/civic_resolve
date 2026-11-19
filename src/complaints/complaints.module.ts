@@ -6,10 +6,12 @@ import { Complaint } from './entities/complaint.entity';
 import { User } from 'src/users/entities/user.entity';
 import { Department } from 'src/departments/entities/department.entity';
 import { AiModule } from 'src/ai/ai.module';
+import { PriorityModule } from 'src/priority/priority.module';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Complaint,User,Department]),
- AiModule],
+ AiModule,
+ PriorityModule],
   
   providers: [ComplaintsService],
   controllers: [ComplaintsController],

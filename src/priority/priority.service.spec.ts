@@ -46,4 +46,66 @@ describe('PriorityService', () => {
       priorityService.calculatePriority(NaN, 50, 50, 50, 50),
     ).toThrow('All priority scores must be between 0 and 100.');
   });
+
+
+  it('should convert all urgency levels into numerical scores', () => {
+    expect(priorityService.calculateUrgencyScore('LOW')).toBe(25);
+    expect(priorityService.calculateUrgencyScore('MEDIUM')).toBe(50);
+    expect(priorityService.calculateUrgencyScore('HIGH')).toBe(75);
+    expect(priorityService.calculateUrgencyScore('CRITICAL')).toBe(100);
+  });
+
+  it('should handle lowercase urgency values', () => {
+    expect(priorityService.calculateUrgencyScore('critical')).toBe(100);
+  });
+
+  it('should reject invalid urgency levels', () => {
+    expect(() =>
+      priorityService.calculateUrgencyScore('UNKNOWN'),
+    ).toThrow('Invalid urgency level.');
+  });
+
+  it('should calculate approximately 14.29 points for one day of waiting', () => {
+    const oneDayAgo = new Date(
+      Date.now() - 24 * 60 * 60 * 1000,
+    );
+
+    const result = priorityService.calculateWaitingTime(oneDayAgo);
+
+    expect(result).toBeCloseTo(14.29, 2);
+  });
+
+  it('should calculate 50 points for 3.5 days of waiting', () => {
+    const threeAndHalfDaysAgo = new Date(
+      Date.now() - 3.5 * 24 * 60 * 60 * 1000,
+    );
+
+    const result = priorityService.calculateWaitingTime(
+      threeAndHalfDaysAgo,
+    );
+
+    expect(result).toBe(50);
+  });
+
+  it('should not exceed 100 waiting-time points', () => {
+    const tenDaysAgo = new Date(
+      Date.now() - 10 * 24 * 60 * 60 * 1000,
+    );
+
+    const result = priorityService.calculateWaitingTime(tenDaysAgo);
+
+    expect(result).toBe(100);
+  });
+
+  it('should reject invalid or future creation dates', () => {
+    expect(() =>
+      priorityService.calculateWaitingTime(new Date('invalid')),
+    ).toThrow('Invalid complaint creation date.');
+
+    expect(() =>
+      priorityService.calculateWaitingTime(
+        new Date(Date.now() + 24 * 60 * 60 * 1000),
+      ),
+    ).toThrow('Invalid complaint creation date.');
+  });
 });

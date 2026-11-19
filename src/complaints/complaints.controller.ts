@@ -19,6 +19,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../users/entities/user.entity';
 import { AssignComplaintDto } from './dto/assign-complaint.dto';
 import { UpdateComplaintStatusDto } from './dto/update-complaint-status.dto';
+import { AssessComplaintDto } from './dto/assess-complaint.dto';
 
 @Controller('complaints')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -102,6 +103,20 @@ updateStatus(
     complaintId,
     req.user.departmentId,
     updateComplaintStatusDto.status,
+  );
+}
+
+@Patch(':id/assessment')
+@Roles(UserRole.COMPLAINT_OFFICER, UserRole.ADMIN)
+assessComplaint(
+  @Param('id') complaintId: string,
+  @Body() assessComplaintDto: AssessComplaintDto,
+  @Req() req: any,
+) {
+  return this.complaintsService.assessComplaint(
+    complaintId,
+    assessComplaintDto,
+    req.user.userId,
   );
 }
 }

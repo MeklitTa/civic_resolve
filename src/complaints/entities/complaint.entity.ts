@@ -97,6 +97,23 @@ export class Complaint {
   })
   priorityScore!: number | null;
 
+    // Officer's verified urgency
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  officerUrgency!: string | null;
+
+  // Explanation if officer changes AI urgency
+  @Column({ type: 'text', nullable: true })
+  officerReviewNote!: string | null;
+
+  // Review timestamp
+  @Column({ type: 'timestamptz', nullable: true })
+  reviewedAt!: Date | null;
+
+  // Officer who reviewed the complaint
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'reviewed_by_id' })
+  reviewedBy!: User | null;
+
 
 
   @ManyToOne(() => User, { nullable: false })
