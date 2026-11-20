@@ -21,6 +21,8 @@ import { AssignComplaintDto } from './dto/assign-complaint.dto';
 import { AiService } from 'src/ai/ai.service';
 import { PriorityService } from 'src/priority/priority.service';
 import { AssessComplaintDto } from './dto/assess-complaint.dto';
+import { ComplaintResponseDto } from './dto/complaint-response.dto';
+import { MyComplaintResponseDto } from './dto/my-complaint-response.dto';
 
 @Injectable()
 export class ComplaintsService {
@@ -93,27 +95,64 @@ async create(
   return savedComplaint;
 }
 
-async findMyComplaints(citizenId: string) {
-  return this.complaintsRepository.find({
-    where: {
-      citizen: {
-        id: citizenId,
-      },
-    },
-    order: {
-      createdAt: 'DESC',
-    },
+async findMyComplaints(
+  citizenId: string,
+): Promise<MyComplaintResponseDto[]> {
+  const complaints = await this.complaintsRepository.find({
+    where: { citizen: { id: citizenId } },
+    order: { createdAt: 'DESC' },
   });
+
+  return complaints.map((complaint) => ({
+    id: complaint.id,
+    complaintNumber: complaint.complaintNumber,
+    title: complaint.title,
+    description: complaint.description,
+    category: complaint.category,
+    location: complaint.location,
+    status: complaint.status,
+
+    aiUrgency: complaint.aiUrgency,
+    
+
+    createdAt: complaint.createdAt,
+    updatedAt: complaint.updatedAt,
+  }));
 }
 
-async findAll(page = 1, limit = 10) {
+
+async findAll(
+  page = 1,
+  limit = 10,
+  status?: ComplaintStatus,
+  departmentId?: string,
+) {
+  // 1. Validate status
+  if (
+    status &&
+    !Object.values(ComplaintStatus).includes(status)
+  ) {
+    throw new BadRequestException('Invalid complaint status.');
+  }
+
+  // 2. Retrieve complaints
   const [complaints, total] =
     await this.complaintsRepository.findAndCount({
+      where: {
+        ...(status ? { status } : {}),
+        ...(departmentId
+          ? { assignedDepartment: { id: departmentId } }
+          : {}),
+      },
       relations: {
         citizen: true,
         assignedDepartment: true,
       },
       order: {
+        priorityScore: {
+          direction: 'DESC',
+          nulls: 'LAST',
+        },
         createdAt: 'DESC',
       },
       skip: (page - 1) * limit,
@@ -121,13 +160,17 @@ async findAll(page = 1, limit = 10) {
     });
 
   return {
-    data: complaints,
-    total,
-    page,
-    limit,
-    totalPages: Math.ceil(total / limit),
-  };
+  data: complaints.map((complaint) =>
+    this.toComplaintResponse(complaint),
+  ),
+  total,
+  page,
+  limit,
+  totalPages: Math.ceil(total / limit),
+};
 }
+
+
 
  async assignComplaint(
   complaintId: string,
@@ -222,7 +265,7 @@ async assessComplaint(
 
   // 5. Calculate urgency using the officer's decision
   const urgencyScore =
-    this.priorityService.calculateUrgencyScore(officerUrgency);
+    this.priorityService.calculateUrgencyScore(officerUrgency); 
 
   // 6. Calculate waiting time
   const waitingTimeScore =
@@ -271,11 +314,9 @@ async assessComplaint(
 
 
 async findDepartmentComplaints(departmentId: string) {
-  return this.complaintsRepository.find({
+  const complaints = await this.complaintsRepository.find({
     where: {
-      assignedDepartment: {
-        id: departmentId,
-      },
+      assignedDepartment: { id: departmentId },
     },
     relations: {
       citizen: true,
@@ -283,9 +324,17 @@ async findDepartmentComplaints(departmentId: string) {
       assignedBy: true,
     },
     order: {
+      priorityScore: {
+        direction: 'DESC',
+        nulls: 'LAST',
+      },
       createdAt: 'DESC',
     },
   });
+
+  return complaints.map((complaint) =>
+    this.toComplaintResponse(complaint),
+  );
 }
 
 async updateStatus(
@@ -337,6 +386,54 @@ async updateStatus(
   }
 
   return this.complaintsRepository.save(complaint);
+}
+
+private toComplaintResponse(
+  complaint: Complaint,
+): ComplaintResponseDto {
+  return {
+    id: complaint.id,
+    complaintNumber: complaint.complaintNumber,
+    title: complaint.title,
+    description: complaint.description,
+    category: complaint.category,
+    location: complaint.location,
+    status: complaint.status,
+
+    // Original AI prediction
+    aiUrgency: complaint.aiUrgency,
+    aiConfidence: complaint.aiConfidence,
+    aiPredictedAt: complaint.aiPredictedAt,
+
+    // Priority assessment
+    severityScore: complaint.severityScore,
+    publicImpactScore: complaint.publicImpactScore,
+    safetyRiskScore: complaint.safetyRiskScore,
+    priorityScore: complaint.priorityScore,
+
+    // Officer review
+    officerUrgency: complaint.officerUrgency,
+    officerReviewNote: complaint.officerReviewNote,
+    reviewedAt: complaint.reviewedAt,
+
+    // Citizen information
+    citizen: {
+      id: complaint.citizen.id,
+      fullName: complaint.citizen.fullName,
+      email: complaint.citizen.email,
+    },
+
+    // Assigned department
+    assignedDepartment: complaint.assignedDepartment
+      ? {
+          id: complaint.assignedDepartment.id,
+          name: complaint.assignedDepartment.name,
+        }
+      : null,
+
+    createdAt: complaint.createdAt,
+    updatedAt: complaint.updatedAt,
+  };
 }
 
 }

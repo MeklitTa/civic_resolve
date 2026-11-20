@@ -20,6 +20,7 @@ import { UserRole } from '../users/entities/user.entity';
 import { AssignComplaintDto } from './dto/assign-complaint.dto';
 import { UpdateComplaintStatusDto } from './dto/update-complaint-status.dto';
 import { AssessComplaintDto } from './dto/assess-complaint.dto';
+import { ComplaintStatus } from './entities/complaint.entity';
 
 @Controller('complaints')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -48,13 +49,18 @@ findMyComplaints(@Req() req: any) {
   );
 }
 
+
+
 @Get()
 @Roles(UserRole.COMPLAINT_OFFICER, UserRole.ADMIN)
 findAll(
   @Query('page') page = '1',
   @Query('limit') limit = '10',
+  @Query('status') status?: ComplaintStatus,
+  @Query('departmentId') departmentId?: string,
 ) {
   const currentPage = Math.max(1, Number(page) || 1);
+
   const pageSize = Math.min(
     100,
     Math.max(1, Number(limit) || 10),
@@ -63,8 +69,13 @@ findAll(
   return this.complaintsService.findAll(
     currentPage,
     pageSize,
+    status,
+    departmentId,
   );
 }
+
+
+
 @Patch(':id/assign')
 @Roles(UserRole.COMPLAINT_OFFICER, UserRole.ADMIN)
 assignComplaint(
